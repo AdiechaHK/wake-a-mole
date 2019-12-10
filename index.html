@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Wake A Mole...</title>
+  <script type="text/javascript" src="vue.js"></script>
+  <style type="text/css">
+    #app {
+      width: 100%;
+      text-align: center;
+    }
+
+    table {
+      margin: auto;
+    }
+
+    .mole {
+      height: 160px;
+      width: 160px;
+      border: 2px solid black;
+      background-color: gray;
+      border-radius: 50%;
+      text-align: center;
+    }
+
+    .mole img {
+      margin-top: 30px
+    }
+  </style>
+</head>
+<body>
+
+  <div id="app">
+    <div v-show="state == 'intro'">
+      <input type="text" v-model="player.name">
+      <button @click="state = 'running'">Start Game</button>
+    </div>
+    <div v-show="state == 'running'">
+      <h1> {{ player.name }} </h1>
+      <pre>Score: {{player.hit}} / {{player.wrong}} / {{game.count}}</pre>
+      <div>
+        <table>
+          <tr v-for="c in seriesGen(game.size)">
+            <td v-for="r in seriesGen(game.size)">
+              <mole :row="r" :col="c"></mole>
+            </td>
+          </tr>
+        </table>
+      </div>
+      <button v-show="game.status == 'waiting'" @click="startGame">
+        Start
+      </button>
+      <button v-show="game.status == 'running'" @click="stopGame">
+        Stop
+      </button>
+      <button @click="state = 'intro'">Change Player Name</button>
+    </div>
+  </div>
+
+  <template id="mole">
+    <div class="mole" @click="hit">
+      <img v-if="status != 'normal'" :src="src">
+    </div>
+  </template>
+
+  <script type="text/javascript">
+
+    var eventBus = new Vue();
+
+    Vue.component('mole', {
+      template: '#mole',
+      props: ["row", "col"],
+      data: function() {
+        return {
+          status: 'normal'
+        }
+      },
+      computed: {
+        src: function() {
+          return this.status == 'hit' ? 'open.png': 'close.png';
+        }
+      },
+      methods: {
+        hit: function() {
+          eventBus.$emit('score', this.status);
+          this.status = this.status == 'active'? 'hit': 'normal'
+        }
+      },
+      mounted: function() {
+        eventBus.$on('newSpot', (r, c) => {
+          this.status = (this.row == r && this.col == c) ? 'active' : 'normal'
+        })
+      }
+    })
+
+    var app = new Vue({
+      el: '#app',
+      data: {
+        state: 'intro',
+        game: {
+          status: 'waiting',
+          size: 3,
+          count: 0
+        },
+        player: {
+          name: "annonymous",
+          hit: 0,
+          wrong: 0
+        }
+      },
+      methods: {
+        seriesGen: function(num) {
+          if(num > 0) return Array.from(Array(num).keys());
+          else [];
+        },
+        startGame: function() {
+          this.game.status = 'running';
+          this.game.interval = setInterval(this.newSpot, 1000);
+        },
+        stopGame: function() {
+          this.game.status = 'waiting';
+          clearInterval(this.game.interval);
+        },
+        newSpot: function() {
+          this.game.count++;
+          let rand = () => Math.floor(Math.random() * 2000) % this.game.size
+          eventBus.$emit('newSpot', rand(), rand());
+        }
+      },
+      mounted() {
+        eventBus.$on('score', (type) => {
+          if(type == 'active') this.player.hit++;
+          else this.player.wrong++;
+        })
+      }
+    });
+  </script>
+
+
+</body>
+</html>
